@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+
+# --- Virtual envs ---
+.venv/
+venv/
+env/
+*.env
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Data ---
+data/raw/
+data/interim/
+data/processed/
+data/splits/
+*.npz
+*.npy
+*.csv
+*.json
+*.yaml
+
+# --- Logs & outputs ---
+logs/
+runs/
+*.log
+*.txt
+*.out
+*.err
+
+# --- Model checkpoints ---
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# --- Visualizations & debug ---
+outputs/
+figures/
+*.png
+*.jpg
+*.jpeg
+*.mp4
+
+# --- OS / Editor specific ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
