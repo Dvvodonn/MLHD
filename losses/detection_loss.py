@@ -4,9 +4,9 @@
 Detection loss for the MLHD YOLO-like single-class detector.
 
 Preds/targets shape: (B, S, S, 5)
-Channel order: [t_x, t_y, t_w, t_h, t_obj]
+Channel order: [tx, ty, tw, th, obj]
 
-- Coordinate loss (xy + wh terms) is only applied to positive cells (t_obj* == 1).
+- Coordinate loss (xy + wh terms) is only applied to positive cells (obj* == 1).
 - Objectness loss is BCE on all cells, with negatives down-weighted by lambda_noobj.
 - Optionally, the objectness term can be passed as logits (pre-sigmoid) using obj_from_logits=True.
 

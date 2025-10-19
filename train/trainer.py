@@ -11,11 +11,11 @@ This module provides:
 
 Expected DataLoader output per batch:
   imgs_t:   torch.FloatTensor of shape (B, 3, H, W)
-  targets_t:torch.FloatTensor of shape (B, S, S, 5)
+  targets_t:torch.FloatTensor of shape (B, S, S, 5) where last dim is [tx, ty, tw, th, obj]
   paths:    list[str] (optional, for debugging)
 
 Model expected output per forward:
-  preds: torch.FloatTensor of shape (B, S, S, 5)
+  preds: torch.FloatTensor of shape (B, S, S, 5) where last dim is [tx, ty, tw, th, obj]
 
 Loss function signature:
   detection_loss(preds, targets, lambda_coord=5.0, lambda_noobj=0.5, obj_from_logits=False)
@@ -33,6 +33,11 @@ try:
     from losses.detection_loss import detection_loss
 except Exception as e:
     raise ImportError("Could not import detection_loss from losses.detection_loss. Ensure the file exists.") from e
+
+try:
+    from datasets.dataloader import CCTVDetectionDataset
+except Exception as e:
+    raise ImportError("Could not import CCTVDetectionDataset from datasets.dataloader. Ensure the file exists.") from e
 
 
 def train_one_epoch(

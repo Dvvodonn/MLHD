@@ -47,7 +47,7 @@ class CCTVDetectionDataset(Dataset):
 
         Returns:
             image: Tensor [3, img_size, img_size] normalized to [0, 1]
-            target: Tensor [S, S, 5] where last dim is [obj, tx, ty, tw, th]
+            target: Tensor [S, S, 5] where last dim is [tx, ty, tw, th, obj]
         """
         img_path = self.image_paths[idx]
         label_path = self._get_label_path(img_path)

@@ -29,7 +29,7 @@ def load_yolo_labels(label_path: str) -> List[Tuple[float, float, float, float]]
 
 def encode_targets(boxes: List[Tuple[float, float, float, float]], grid_size: int = 13) -> torch.Tensor:
     """
-    Convert boxes to grid target tensor [S, S, 5] where last dim is [obj, tx, ty, tw, th].
+    Convert boxes to grid target tensor [S, S, 5] where last dim is [tx, ty, tw, th, obj].
     tx, ty are cell-relative offsets. Keeps first box if multiple map to same cell.
     """
     S = grid_size
@@ -49,7 +49,7 @@ def encode_targets(boxes: List[Tuple[float, float, float, float]], grid_size: in
         t_x = cx * S - i
         t_y = cy * S - j
 
-        target[j, i, :] = torch.tensor([1.0, t_x, t_y, w, h], dtype=torch.float32)
+        target[j, i, :] = torch.tensor([t_x, t_y, w, h, 1.0], dtype=torch.float32)
         occupied[j, i] = True
 
     return target

@@ -7,6 +7,7 @@ class DetectionHead(nn.Module):
     """
     Takes (B, 512, Hf, Wf) features, outputs (B, S, S, 5).
     We do a 1x1 convolution to map 512-d features -> 5 outputs per cell.
+    Output channels: [tx, ty, tw, th, obj]
     """
     def __init__(self, S: int):
         super().__init__()
