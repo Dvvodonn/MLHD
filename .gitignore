@@ -22,6 +22,8 @@ env/
 data/raw/
 data/interim/
 data/processed/
+data/processed_training_3/
+data/labeled_3/
 data/splits/
 *.npz
 *.npy
