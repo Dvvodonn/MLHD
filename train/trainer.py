@@ -165,14 +165,19 @@ def fit(
     scheduler: Optional[Any] = None,
     ckpt_dir: str = "checkpoints",
     ckpt_name: str = "best.pt",
+    early_stopping_patience: int = 10,
     print_fn=print,
 ) -> Dict[str, float]:
     """Full training loop with optional validation and checkpointing.
+
+    Args:
+        early_stopping_patience: Stop training if val loss doesn't improve for this many epochs (default: 10)
 
     Returns a dict with final metrics: {"best_val": float}
     """
     os.makedirs(ckpt_dir, exist_ok=True)
     best_val = math.inf
+    epochs_without_improvement = 0
 
     model.to(device)
 
@@ -205,6 +210,7 @@ def fit(
         # Save best checkpoint on validation
         if val_loader is not None and not math.isnan(va_loss) and va_loss < best_val:
             best_val = va_loss
+            epochs_without_improvement = 0
             torch.save({
                 "epoch": epoch,
                 "model": model.state_dict(),
@@ -212,5 +218,13 @@ def fit(
                 "val_loss": va_loss,
             }, os.path.join(ckpt_dir, ckpt_name))
             print_fn(f"  ↳ saved {os.path.join(ckpt_dir, ckpt_name)}")
+        else:
+            epochs_without_improvement += 1
+
+        # Early stopping check
+        if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+            print_fn(f"\n[Early Stopping] No improvement for {early_stopping_patience} epochs. Stopping at epoch {epoch}.")
+            print_fn(f"Best validation loss: {best_val:.4f}")
+            break
 
     return {"best_val": best_val}

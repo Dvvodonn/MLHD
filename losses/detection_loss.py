@@ -58,16 +58,16 @@ def detection_loss(
     th = targets[..., 3]
     tobj = targets[..., 4]
 
-    # Masks
-    pos_mask = (tobj == 1.0)
-    neg_mask = ~pos_mask
+    # Masks (convert to float for element-wise ops, MPS-compatible)
+    pos_mask = (tobj == 1.0).float()
+    neg_mask = 1.0 - pos_mask
 
     # -------------------------
     # 1) Coordinate loss (positives only)
     # -------------------------
-    # Position (x, y)
+    # Position (x, y) - use element-wise multiplication instead of indexing
     xy_err = (px - tx) ** 2 + (py - ty) ** 2
-    xy_loss = xy_err[pos_mask].sum()
+    xy_loss = (xy_err * pos_mask).sum()
 
     # Size (w, h): compare squared widths/heights to stabilize gradients near small boxes
     w2_pred = pw ** 2
@@ -76,7 +76,7 @@ def detection_loss(
     h2_tgt = th ** 2
 
     wh_err = (w2_pred - w2_tgt) ** 2 + (h2_pred - h2_tgt) ** 2
-    wh_loss = wh_err[pos_mask].sum()
+    wh_loss = (wh_err * pos_mask).sum()
 
     coord_loss = lambda_coord * (xy_loss + wh_loss)
 
@@ -84,13 +84,17 @@ def detection_loss(
     # 2) Objectness loss on all cells
     # -------------------------
     if obj_from_logits:
-        # pobj are logits
-        pos_bce = F.binary_cross_entropy_with_logits(pobj[pos_mask], torch.ones_like(pobj[pos_mask]), reduction="sum")
-        neg_bce = F.binary_cross_entropy_with_logits(pobj[neg_mask], torch.zeros_like(pobj[neg_mask]), reduction="sum")
+        # pobj are logits - compute BCE per element, then mask
+        pos_bce_all = F.binary_cross_entropy_with_logits(pobj, torch.ones_like(pobj), reduction="none")
+        neg_bce_all = F.binary_cross_entropy_with_logits(pobj, torch.zeros_like(pobj), reduction="none")
+        pos_bce = (pos_bce_all * pos_mask).sum()
+        neg_bce = (neg_bce_all * neg_mask).sum()
     else:
-        # pobj are probabilities in (0,1)
-        pos_bce = F.binary_cross_entropy(pobj[pos_mask], torch.ones_like(pobj[pos_mask]), reduction="sum")
-        neg_bce = F.binary_cross_entropy(pobj[neg_mask], torch.zeros_like(pobj[neg_mask]), reduction="sum")
+        # pobj are probabilities in (0,1) - compute BCE per element, then mask
+        pos_bce_all = F.binary_cross_entropy(pobj, torch.ones_like(pobj), reduction="none")
+        neg_bce_all = F.binary_cross_entropy(pobj, torch.zeros_like(pobj), reduction="none")
+        pos_bce = (pos_bce_all * pos_mask).sum()
+        neg_bce = (neg_bce_all * neg_mask).sum()
 
     obj_loss = pos_bce + lambda_noobj * neg_bce
 

@@ -1,5 +1,0 @@
-train: training_3/images/train
-val: training_3/images/val
-
-nc: 1
-names: ['person']
