@@ -14,21 +14,21 @@ from torch.utils.data import DataLoader
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from datasets.dataloader import CCTVDetectionDataset
+from datasets.dataloader_augmented import CCTVDetectionDataset
 from models.yolo_like import Model
 from train.trainer import fit
 
 
 def main():
-    # Hyperparameters
+    # Hyperparameters (OPTIMIZED - Nov 2025)
     IMG_SIZE = 416
     GRID_SIZE = 26
-    BATCH_SIZE = 4  # Smaller batch for better regularization
-    EPOCHS = 100
-    LR = 5e-5  # Lower LR for more stable training
-    LAMBDA_COORD = 5.0  # Back to original (10.0 caused overfitting)
-    LAMBDA_NOOBJ = 0.5
-    EARLY_STOPPING_PATIENCE = 10  # Stop if no improvement for 10 epochs
+    BATCH_SIZE = 8  # Increased from 4 for more stable gradients
+    EPOCHS = 150  # Increased from 100 for better convergence
+    LR = 1e-4  # Increased from 5e-5 for faster convergence
+    LAMBDA_COORD = 10.0  # Increased from 5.0 for better box localization
+    LAMBDA_NOOBJ = 0.7  # Increased from 0.5 to reduce false positives
+    EARLY_STOPPING_PATIENCE = 20  # Increased from 10 for more patience
     NUM_WORKERS = 0  # Use 0 for MPS on macOS (single-threaded data loading)
 
     # Resume training from checkpoint?
@@ -57,14 +57,16 @@ def main():
         image_dir=str(TRAIN_IMAGES),
         label_dir=str(TRAIN_LABELS),
         grid_size=GRID_SIZE,
-        img_size=IMG_SIZE
+        img_size=IMG_SIZE,
+        augment=True  # Enable augmentation for training
     )
 
     val_dataset = CCTVDetectionDataset(
         image_dir=str(VAL_IMAGES),
         label_dir=str(VAL_LABELS),
         grid_size=GRID_SIZE,
-        img_size=IMG_SIZE
+        img_size=IMG_SIZE,
+        augment=False  # No augmentation for validation
     )
 
     print(f"Train samples: {len(train_dataset)}")

@@ -20,6 +20,13 @@ def load_yolo_labels(label_path: str) -> List[Tuple[float, float, float, float]]
                     continue
 
                 cx, cy, w, h = map(float, parts[1:5])
+
+                # Clamp to valid [0, 1] range to handle floating-point errors
+                cx = max(0.0, min(1.0, cx))
+                cy = max(0.0, min(1.0, cy))
+                w = max(0.0, min(1.0, w))
+                h = max(0.0, min(1.0, h))
+
                 boxes.append((cx, cy, w, h))
     except FileNotFoundError:
         pass

@@ -179,6 +179,10 @@ def fit(
     best_val = math.inf
     epochs_without_improvement = 0
 
+    # Track loss history for visualization
+    train_losses = []
+    val_losses = []
+
     model.to(device)
 
     for epoch in range(1, epochs + 1):
@@ -205,6 +209,10 @@ def fit(
             except TypeError:
                 scheduler.step()
 
+        # Track loss history
+        train_losses.append(tr_loss)
+        val_losses.append(va_loss)
+
         print_fn(f"[Epoch {epoch:02d}] train {tr_loss:.4f} | val {va_loss:.4f}")
 
         # Save best checkpoint on validation
@@ -216,6 +224,8 @@ def fit(
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "val_loss": va_loss,
+                "train_losses": train_losses,
+                "val_losses": val_losses,
             }, os.path.join(ckpt_dir, ckpt_name))
             print_fn(f"  ↳ saved {os.path.join(ckpt_dir, ckpt_name)}")
         else:
