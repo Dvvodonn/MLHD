@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from datasets.dataloader_augmented import CCTVDetectionDataset
 from models.yolo_like import Model
 from train.trainer import fit
+from utils.device import get_best_device, describe_device
 
 
 def main():
@@ -31,10 +32,6 @@ def main():
     EARLY_STOPPING_PATIENCE = 20  # Increased from 10 for more patience
     NUM_WORKERS = 0  # Use 0 for MPS on macOS (single-threaded data loading)
 
-    # Resume training from checkpoint?
-    RESUME = False  # Set to True to continue from checkpoints/best.pt
-    RESUME_PATH = ROOT / 'checkpoints/best.pt'
-
     # Paths
     TRAIN_IMAGES = ROOT / 'data/processed_training_3/images/train'
     TRAIN_LABELS = ROOT / 'data/processed_training_3/labels/train'
@@ -42,14 +39,9 @@ def main():
     VAL_LABELS = ROOT / 'data/processed_training_3/labels/val'
     CHECKPOINT_DIR = ROOT / 'checkpoints'
 
-    # Device (prioritize: CUDA > MPS > CPU)
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
-    elif torch.backends.mps.is_available():
-        device = torch.device('mps')
-    else:
-        device = torch.device('cpu')
-    print(f"Using device: {device}")
+    # Device
+    device = get_best_device()
+    print(f"Using device: {describe_device(device)}")
 
     # Create datasets
     print("\nCreating datasets...")
@@ -108,27 +100,6 @@ def main():
         optimizer, mode='min', factor=0.5, patience=5
     )
 
-    # Load checkpoint if resuming
-    start_epoch = 1
-    total_epochs = EPOCHS
-    if RESUME and RESUME_PATH.exists():
-        print(f"\n{'='*60}")
-        print(f"Resuming from checkpoint: {RESUME_PATH}")
-        checkpoint = torch.load(RESUME_PATH, map_location=device)
-        model.load_state_dict(checkpoint['model'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        start_epoch = checkpoint['epoch'] + 1
-        remaining_epochs = EPOCHS - checkpoint['epoch']
-        print(f"Checkpoint saved at epoch {checkpoint['epoch']}")
-        print(f"Previous best val loss: {checkpoint['val_loss']:.4f}")
-        print(f"Will train for {remaining_epochs} more epochs (until epoch {EPOCHS})")
-        print(f"{'='*60}\n")
-        # Adjust epochs to train only the remaining
-        EPOCHS = remaining_epochs
-    elif RESUME and not RESUME_PATH.exists():
-        print(f"\n[WARNING] RESUME=True but checkpoint not found at {RESUME_PATH}")
-        print(f"Starting training from scratch...\n")
-
     # Training config
     print("\n" + "="*60)
     print("Training Configuration")
@@ -136,10 +107,7 @@ def main():
     print(f"Image size: {IMG_SIZE}x{IMG_SIZE}")
     print(f"Grid size: {GRID_SIZE}x{GRID_SIZE}")
     print(f"Batch size: {BATCH_SIZE}")
-    print(f"Total target epochs: {total_epochs}")
-    print(f"Epochs to train: {EPOCHS}")
-    if RESUME and start_epoch > 1:
-        print(f"Starting from epoch: {start_epoch}")
+    print(f"Epochs: {EPOCHS}")
     print(f"Learning rate: {LR}")
     print(f"Lambda coord: {LAMBDA_COORD}")
     print(f"Lambda noobj: {LAMBDA_NOOBJ}")
@@ -159,9 +127,9 @@ def main():
         lambda_noobj=LAMBDA_NOOBJ,
         obj_from_logits=False,
         scheduler=scheduler,
+        early_stopping_patience=EARLY_STOPPING_PATIENCE,
         ckpt_dir=str(CHECKPOINT_DIR),
         ckpt_name='best.pt',
-        early_stopping_patience=EARLY_STOPPING_PATIENCE,
         print_fn=print
     )
 

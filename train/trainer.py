@@ -57,7 +57,7 @@ def train_one_epoch(
         model: nn.Module producing (B,S,S,5)
         loader: DataLoader yielding (imgs_t, targets_t, paths)
         optimizer: torch optimizer
-        device: cpu/cuda device
+        device: cpu/cuda/mps device
         lambda_coord: coord loss weight
         lambda_noobj: no-object BCE weight
         obj_from_logits: whether objectness is provided as logits
@@ -79,8 +79,9 @@ def train_one_epoch(
         else:
             raise ValueError("Expected batch to be a tuple/list: (imgs_t, targets_t, *_) ")
 
-        imgs_t = imgs_t.to(device, non_blocking=True)
-        targets_t = targets_t.to(device, non_blocking=True)
+        non_blocking = device.type != "cpu"
+        imgs_t = imgs_t.to(device, non_blocking=non_blocking)
+        targets_t = targets_t.to(device, non_blocking=non_blocking)
 
         # Forward
         preds = model(imgs_t)
@@ -132,8 +133,9 @@ def evaluate(
         else:
             raise ValueError("Expected batch to be a tuple/list: (imgs_t, targets_t, *_) ")
 
-        imgs_t = imgs_t.to(device, non_blocking=True)
-        targets_t = targets_t.to(device, non_blocking=True)
+        non_blocking = device.type != "cpu"
+        imgs_t = imgs_t.to(device, non_blocking=non_blocking)
+        targets_t = targets_t.to(device, non_blocking=non_blocking)
 
         preds = model(imgs_t)
         loss = detection_loss(
