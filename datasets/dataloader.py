@@ -14,12 +14,12 @@ class CCTVDetectionDataset(Dataset):
     Loads images and YOLO format labels, applies letterbox resize, encodes to grid targets.
     """
 
-    def __init__(self, image_dir: str, label_dir: str, grid_size: int = 26, img_size: int = 416):
+    def __init__(self, image_dir: str, label_dir: str, grid_size: int = 13, img_size: int = 416):
         """
         Args:
             image_dir: Directory containing .jpg images
             label_dir: Directory containing .txt label files (YOLO format)
-            grid_size: Grid dimension S (default 26 for 416x416 images)
+            grid_size: Grid dimension S (default 13 for 416x416 images)
             img_size: Target image size (default 416)
         """
         self.image_dir = image_dir

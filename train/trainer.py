@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import torch
 from torch.utils.data import DataLoader
@@ -39,6 +39,8 @@ try:
 except Exception as e:
     raise ImportError("Could not import CCTVDetectionDataset from datasets.dataloader. Ensure the file exists.") from e
 
+from .metrics import DetectionMetricTracker
+
 
 def train_one_epoch(
     model: torch.nn.Module,
@@ -50,7 +52,9 @@ def train_one_epoch(
     lambda_noobj: float = 0.5,
     obj_from_logits: bool = False,
     max_batches: Optional[int] = None,
-) -> float:
+    metric_thresholds: Tuple[float, ...] = (0.5, 0.85),
+    obj_threshold: float = 0.5,
+) -> Tuple[float, Dict[str, float]]:
     """Run one training epoch.
 
     Args:
@@ -62,13 +66,19 @@ def train_one_epoch(
         lambda_noobj: no-object BCE weight
         obj_from_logits: whether objectness is provided as logits
         max_batches: if set, limit number of batches (useful for smoke tests)
+        metric_thresholds: IoU thresholds for metric tracking
+        obj_threshold: Objectness cutoff for considering predictions positive
 
     Returns:
-        Average loss over the dataset (mean per sample)
+        Tuple (average loss, metric summary dict)
     """
     model.train()
     running = 0.0
     seen = 0
+    metric_tracker = DetectionMetricTracker(
+        iou_thresholds=metric_thresholds,
+        obj_threshold=obj_threshold,
+    )
 
     for b_idx, batch in enumerate(loader):
         if max_batches is not None and b_idx >= max_batches:
@@ -104,8 +114,9 @@ def train_one_epoch(
         bs = imgs_t.size(0)
         running += loss.item() * bs
         seen += bs
+        metric_tracker.update(preds.detach(), targets_t)
 
-    return running / max(1, seen)
+    return running / max(1, seen), metric_tracker.summary()
 
 
 @torch.no_grad()
@@ -118,11 +129,20 @@ def evaluate(
     lambda_noobj: float = 0.5,
     obj_from_logits: bool = False,
     max_batches: Optional[int] = None,
-) -> float:
-    """Evaluate average loss over a dataset."""
+    metric_thresholds: Tuple[float, ...] = (0.5, 0.85),
+    obj_threshold: float = 0.5,
+) -> Tuple[float, Dict[str, float]]:
+    """Evaluate average loss over a dataset along with IoU metrics.
+
+    Args mirror train_one_epoch; metric_thresholds and obj_threshold control metric computation.
+    """
     model.eval()
     running = 0.0
     seen = 0
+    metric_tracker = DetectionMetricTracker(
+        iou_thresholds=metric_thresholds,
+        obj_threshold=obj_threshold,
+    )
 
     for b_idx, batch in enumerate(loader):
         if max_batches is not None and b_idx >= max_batches:
@@ -149,8 +169,9 @@ def evaluate(
         bs = imgs_t.size(0)
         running += loss.item() * bs
         seen += bs
+        metric_tracker.update(preds, targets_t)
 
-    return running / max(1, seen)
+    return running / max(1, seen), metric_tracker.summary()
 
 
 def fit(
@@ -169,16 +190,21 @@ def fit(
     ckpt_name: str = "best.pt",
     early_stopping_patience: int = 10,
     print_fn=print,
+    iou_thresholds: Tuple[float, ...] = (0.5, 0.85),
+    obj_threshold: float = 0.5,
 ) -> Dict[str, float]:
     """Full training loop with optional validation and checkpointing.
 
     Args:
         early_stopping_patience: Stop training if val loss doesn't improve for this many epochs (default: 10)
+        iou_thresholds: IoU thresholds (e.g., 0.5, 0.85) for precision/recall reporting
+        obj_threshold: Objectness cutoff for counting detections in metrics
 
-    Returns a dict with final metrics: {"best_val": float}
+    Returns a dict with final metrics: {"best_val": float, "best_miou": float}
     """
     os.makedirs(ckpt_dir, exist_ok=True)
     best_val = math.inf
+    best_miou = -math.inf
     epochs_without_improvement = 0
 
     # Track loss history for visualization
@@ -188,22 +214,27 @@ def fit(
     model.to(device)
 
     for epoch in range(1, epochs + 1):
-        tr_loss = train_one_epoch(
+        tr_loss, tr_metrics = train_one_epoch(
             model, train_loader, optimizer, device,
             lambda_coord=lambda_coord,
             lambda_noobj=lambda_noobj,
             obj_from_logits=obj_from_logits,
+            metric_thresholds=iou_thresholds,
+            obj_threshold=obj_threshold,
         )
 
         if val_loader is not None:
-            va_loss = evaluate(
+            va_loss, va_metrics = evaluate(
                 model, val_loader, device,
                 lambda_coord=lambda_coord,
                 lambda_noobj=lambda_noobj,
                 obj_from_logits=obj_from_logits,
+                metric_thresholds=iou_thresholds,
+                obj_threshold=obj_threshold,
             )
         else:
             va_loss = float('nan')
+            va_metrics = {}
 
         if scheduler is not None:
             try:
@@ -215,10 +246,19 @@ def fit(
         train_losses.append(tr_loss)
         val_losses.append(va_loss)
 
-        print_fn(f"[Epoch {epoch:02d}] train {tr_loss:.4f} | val {va_loss:.4f}")
+        metrics_str = _format_metrics(tr_metrics, iou_thresholds)
+        val_metrics_str = _format_metrics(va_metrics, iou_thresholds) if val_loader is not None else ""
+        if val_metrics_str:
+            print_fn(f"[Epoch {epoch:02d}] train {tr_loss:.4f} ({metrics_str}) | val {va_loss:.4f} ({val_metrics_str})")
+        else:
+            print_fn(f"[Epoch {epoch:02d}] train {tr_loss:.4f} ({metrics_str}) | val {va_loss:.4f}")
 
         # Save best checkpoint on validation
-        if val_loader is not None and not math.isnan(va_loss) and va_loss < best_val:
+        current_miou = va_metrics.get("mean_iou", float("-inf")) if val_loader is not None else float("-inf")
+        improved = val_loader is not None and current_miou > best_miou
+
+        if improved:
+            best_miou = current_miou
             best_val = va_loss
             epochs_without_improvement = 0
             torch.save({
@@ -228,15 +268,34 @@ def fit(
                 "val_loss": va_loss,
                 "train_losses": train_losses,
                 "val_losses": val_losses,
+                "val_mean_iou": current_miou,
             }, os.path.join(ckpt_dir, ckpt_name))
             print_fn(f"  ↳ saved {os.path.join(ckpt_dir, ckpt_name)}")
-        else:
+        elif val_loader is not None:
             epochs_without_improvement += 1
 
         # Early stopping check
-        if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+        if (
+            val_loader is not None
+            and early_stopping_patience > 0
+            and epochs_without_improvement >= early_stopping_patience
+        ):
             print_fn(f"\n[Early Stopping] No improvement for {early_stopping_patience} epochs. Stopping at epoch {epoch}.")
-            print_fn(f"Best validation loss: {best_val:.4f}")
+            print_fn(f"Best validation mIoU: {best_miou:.4f}")
             break
 
-    return {"best_val": best_val}
+    return {"best_val": best_val, "best_miou": best_miou}
+
+
+def _format_metrics(metrics: Dict[str, float], thresholds: Tuple[float, ...]) -> str:
+    if not metrics:
+        return ""
+
+    parts = [f"mIoU {metrics.get('mean_iou', 0.0):.3f}"]
+    for thr in thresholds:
+        tag = f"{thr:.2f}".rstrip("0").rstrip(".")
+        prec = metrics.get(f"precision@{tag}", 0.0)
+        rec = metrics.get(f"recall@{tag}", 0.0)
+        parts.append(f"P@{tag} {prec:.3f}")
+        parts.append(f"R@{tag} {rec:.3f}")
+    return " ".join(parts)

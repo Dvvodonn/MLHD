@@ -2,6 +2,8 @@
 Data augmentation for CCTV person detection.
 Uses Albumentations for bbox-aware augmentations.
 """
+import inspect
+
 try:
     import albumentations as A
     ALBUMENTATIONS_AVAILABLE = True
@@ -21,6 +23,30 @@ def get_training_augmentation():
     if not ALBUMENTATIONS_AVAILABLE:
         return None
 
+    def _pick_arg(transform_cls, *candidate_names):
+        """Return the first constructor arg supported by transform_cls."""
+        params = inspect.signature(transform_cls.__init__).parameters
+        for name in candidate_names:
+            if name in params:
+                return name
+        return None
+
+    gauss_kwargs = {}
+    var_key = _pick_arg(A.GaussNoise, "var_limit", "variance_limit")
+    if var_key:
+        gauss_kwargs[var_key] = (10.0, 50.0)
+
+    compression_kwargs = {}
+    quality_pair_key = _pick_arg(A.ImageCompression, "quality_range")
+    if quality_pair_key:
+        compression_kwargs[quality_pair_key] = (75, 100)
+    else:
+        lower_key = _pick_arg(A.ImageCompression, "quality_lower", "jpeg_quality_lower")
+        upper_key = _pick_arg(A.ImageCompression, "quality_upper", "jpeg_quality_upper")
+        if lower_key and upper_key:
+            compression_kwargs[lower_key] = 75
+            compression_kwargs[upper_key] = 100
+
     return A.Compose([
         # Geometric transformations
         A.HorizontalFlip(p=0.5),
@@ -36,14 +62,14 @@ def get_training_augmentation():
         A.RandomGamma(gamma_limit=(80, 120), p=0.3),
 
         # CCTV-specific augmentations
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),  # Camera noise
+        A.GaussNoise(p=0.3, **gauss_kwargs),  # Camera noise
         A.MotionBlur(blur_limit=5, p=0.3),  # Motion/camera shake
 
         # Contrast enhancement (helps with low-quality CCTV)
         A.CLAHE(clip_limit=2.0, p=0.2),
 
         # Simulate compression artifacts
-        A.ImageCompression(quality_lower=75, quality_upper=100, p=0.2),
+        A.ImageCompression(p=0.2, **compression_kwargs),
 
     ], bbox_params=A.BboxParams(
         format='yolo',

@@ -20,7 +20,7 @@ class CCTVDetectionDataset(Dataset):
         self,
         image_dir: str,
         label_dir: str,
-        grid_size: int = 26,
+        grid_size: int = 8,
         img_size: int = 416,
         augment: bool = False
     ):
@@ -28,7 +28,7 @@ class CCTVDetectionDataset(Dataset):
         Args:
             image_dir: Directory containing .jpg images
             label_dir: Directory containing .txt label files (YOLO format)
-            grid_size: Grid dimension S (default 26 for 416x416 images)
+            grid_size: Grid dimension S (default 13 for 416x416 images)
             img_size: Target image size (default 416)
             augment: Whether to apply data augmentation (training only)
         """

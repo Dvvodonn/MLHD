@@ -23,7 +23,7 @@ from datasets.transforms import letterbox_image
 from eval.evaluator import ObjectDetectionEvaluator, evaluate_predictions
 
 
-def decode_predictions(pred_grid, conf_thresh=0.5, grid_size=26, img_size=416):
+def decode_predictions(pred_grid, conf_thresh=0.5, grid_size=13, img_size=416):
     """
     Decode grid predictions [S, S, 5] to bounding boxes.
     Returns: List of (x1, y1, x2, y2, conf)
@@ -109,7 +109,7 @@ def compute_iou(box1, box2):
     return inter_area / union_area if union_area > 0 else 0.0
 
 
-def infer_image(model, image_path, device, img_size=416, grid_size=26,
+def infer_image(model, image_path, device, img_size=416, grid_size=13,
                 conf_thresh=0.5, iou_thresh=0.5):
     """
     Run inference on a single image.
@@ -168,8 +168,8 @@ def transform_boxes_to_original(boxes, params, img_size=416):
 
 
 def evaluate_dataset(model, image_dir, label_dir, device, img_size=416,
-                    grid_size=26, conf_thresh=0.5, iou_thresh=0.5,
-                    max_images=None):
+                     grid_size=13, conf_thresh=0.5, iou_thresh=0.5,
+                     max_images=None):
     """
     Evaluate model on all images in a directory.
 
@@ -268,6 +268,8 @@ def main():
                        help='Limit evaluation to N images (for testing)')
     parser.add_argument('--output', type=str, default='outputs/evaluation',
                        help='Directory to save evaluation results')
+    parser.add_argument('--grid-size', type=int, default=13,
+                        help='Detection grid size S')
     args = parser.parse_args()
 
     # Device
@@ -281,7 +283,7 @@ def main():
 
     # Load model
     print("\nLoading model...")
-    model = Model(S=26)
+    model = Model(S=args.grid_size)
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(checkpoint['model'])
     model.to(device)
@@ -294,6 +296,7 @@ def main():
 
     all_preds, all_gt, image_ids, stats = evaluate_dataset(
         model, str(val_images), str(val_labels), device,
+        grid_size=args.grid_size,
         conf_thresh=args.conf, iou_thresh=args.iou,
         max_images=args.max_images
     )

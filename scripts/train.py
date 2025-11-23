@@ -6,6 +6,7 @@ Usage: python scripts/train.py
 import sys
 import os
 from pathlib import Path
+import argparse
 
 import torch
 from torch.utils.data import DataLoader
@@ -16,32 +17,50 @@ sys.path.insert(0, str(ROOT))
 
 from datasets.dataloader_augmented import CCTVDetectionDataset
 from models.yolo_like import Model
+from models.backbone import (
+    BACKBONE_REGISTRY,
+    backbone_output_grid,
+    backbone_input_resolution,
+)
 from train.trainer import fit
 from utils.device import get_best_device, describe_device
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train MLHD detector with selectable backbones.")
+    parser.add_argument(
+        "--backbone",
+        default="13x13",
+        choices=sorted(BACKBONE_REGISTRY.keys()),
+        help="Backbone architecture to use (controls feature map size).",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     # Hyperparameters (OPTIMIZED - Nov 2025)
-    IMG_SIZE = 416
-    GRID_SIZE = 26
+    GRID_SIZE = backbone_output_grid(args.backbone)
+    IMG_SIZE = backbone_input_resolution(args.backbone)
     BATCH_SIZE = 8  # Increased from 4 for more stable gradients
-    EPOCHS = 150  # Increased from 100 for better convergence
-    LR = 1e-4  # Increased from 5e-5 for faster convergence
-    LAMBDA_COORD = 10.0  # Increased from 5.0 for better box localization
+    EPOCHS = 50  # Increased from 100 for better convergence
+    LR = 5e-4  # Increased from 5e-5 for faster convergence
+    LAMBDA_COORD = 7.5 # Increased from 5.0 for better box localization
     LAMBDA_NOOBJ = 0.7  # Increased from 0.5 to reduce false positives
-    EARLY_STOPPING_PATIENCE = 20  # Increased from 10 for more patience
+    EARLY_STOPPING_PATIENCE = 7  # Increased from 10 for more patience
     NUM_WORKERS = 0  # Use 0 for MPS on macOS (single-threaded data loading)
-
+    MOMENTUM = 0.9
     # Paths
-    TRAIN_IMAGES = ROOT / 'data/processed_training_3/images/train'
-    TRAIN_LABELS = ROOT / 'data/processed_training_3/labels/train'
-    VAL_IMAGES = ROOT / 'data/processed_training_3/images/val'
-    VAL_LABELS = ROOT / 'data/processed_training_3/labels/val'
+    TRAIN_IMAGES = ROOT / 'data/processed/training_5/images/train'
+    TRAIN_LABELS = ROOT / 'data/processed/training_5/labels/train'
+    VAL_IMAGES = ROOT / 'data/processed/training_5/images/val'
+    VAL_LABELS = ROOT / 'data/processed/training_5/labels/val'
     CHECKPOINT_DIR = ROOT / 'checkpoints'
-
+    DECAY = 5e-4
     # Device
     device = get_best_device()
     print(f"Using device: {describe_device(device)}")
+    print(f"Selected backbone: {args.backbone} -> grid {GRID_SIZE}x{GRID_SIZE}, img {IMG_SIZE}x{IMG_SIZE}")
 
     # Create datasets
     print("\nCreating datasets...")
@@ -87,7 +106,7 @@ def main():
 
     # Create model
     print("\nInitializing model...")
-    model = Model(S=GRID_SIZE)
+    model = Model(S=GRID_SIZE, backbone_name=args.backbone)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -95,7 +114,9 @@ def main():
     print(f"Trainable parameters: {trainable_params:,}")
 
     # Create optimizer and scheduler
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR, 
+                                 weight_decay=DECAY)
+    
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=5
     )
@@ -135,7 +156,8 @@ def main():
 
     print("\n" + "="*60)
     print("Training completed!")
-    print(f"Best validation loss: {results['best_val']:.4f}")
+    print(f"Best validation mIoU: {results['best_miou']:.4f}")
+    print(f"Best validation loss at that point: {results['best_val']:.4f}")
     print(f"Checkpoint saved to: {CHECKPOINT_DIR / 'best.pt'}")
     print("="*60)
 

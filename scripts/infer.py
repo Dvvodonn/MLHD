@@ -19,7 +19,7 @@ from models.yolo_like import Model
 from datasets.transforms import letterbox_image
 
 
-def decode_predictions(pred_grid, conf_thresh=0.5, grid_size=26, img_size=416):
+def decode_predictions(pred_grid, conf_thresh=0.5, grid_size=13, img_size=416):
     """
     Decode grid predictions [S, S, 5] to bounding boxes.
 
@@ -162,7 +162,7 @@ def draw_boxes(image, boxes, output_path=None):
 
 
 def infer_single_image(model, image_path, conf_thresh=0.5, iou_thresh=0.5,
-                       grid_size=26, img_size=416, device='cpu'):
+                       grid_size=13, img_size=416, device='cpu'):
     """
     Run inference on a single image.
 
@@ -244,7 +244,7 @@ def main():
                        help='Confidence threshold')
     parser.add_argument('--iou', type=float, default=0.5,
                        help='NMS IoU threshold')
-    parser.add_argument('--grid-size', type=int, default=26,
+    parser.add_argument('--grid-size', type=int, default=13,
                        help='Grid size S')
     parser.add_argument('--img-size', type=int, default=416,
                        help='Image size')

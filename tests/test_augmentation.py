@@ -73,7 +73,7 @@ def test_augmentation():
         dataset = CCTVDetectionDataset(
             image_dir=train_images,
             label_dir=train_labels,
-            grid_size=26,
+            grid_size=13,
             img_size=416,
             augment=True
         )
