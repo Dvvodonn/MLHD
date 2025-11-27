@@ -291,8 +291,8 @@ def main():
     print(f"Loaded checkpoint from {args.checkpoint}")
 
     # Evaluate on validation set
-    val_images = ROOT / 'data/processed_training_3/images/val'
-    val_labels = ROOT / 'data/processed_training_3/labels/val'
+    val_images = ROOT / 'data/processed/training_5/images/val'
+    val_labels = ROOT / 'data/processed/training_5/labels/val'
 
     all_preds, all_gt, image_ids, stats = evaluate_dataset(
         model, str(val_images), str(val_labels), device,
