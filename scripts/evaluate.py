@@ -262,7 +262,7 @@ def main():
     parser.add_argument('--iou', type=float, default=0.5,
                        help='IoU threshold for NMS')
     parser.add_argument('--iou-eval', type=float, nargs='+',
-                       default=[0.5, 0.75],
+                       default=[0.5, 0.85],
                        help='IoU thresholds for evaluation metrics')
     parser.add_argument('--max-images', type=int, default=None,
                        help='Limit evaluation to N images (for testing)')

@@ -43,9 +43,9 @@ class ObjectDetectionEvaluator:
         """
         Args:
             iou_thresholds: List of IoU thresholds for evaluation.
-                          Default: [0.5, 0.75] (standard COCO metrics)
+                          Default: [0.5, 0.85] (matching training metrics)
         """
-        self.iou_thresholds = iou_thresholds or [0.5, 0.75]
+        self.iou_thresholds = iou_thresholds or [0.5, 0.85]
         self.results = {}
 
     @staticmethod
