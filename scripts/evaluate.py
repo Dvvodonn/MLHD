@@ -324,6 +324,16 @@ def main():
     for iou_thresh, ap in map_scores.items():
         print(f"  IoU {iou_thresh}: {ap:.4f}")
 
+    # Compute mIoU
+    print("\n" + "="*70)
+    print("COMPUTING mIoU (Mean Intersection over Union)")
+    print("="*70)
+
+    print("\nmean Intersection over Union (mIoU):")
+    for iou_thresh in args.iou_eval:
+        miou = evaluator.compute_miou(all_preds, all_gt, iou_threshold=iou_thresh)
+        print(f"  IoU threshold {iou_thresh}: {miou:.4f}")
+
     # Detailed statistics
     print("\n" + "="*70)
     print("DATASET STATISTICS")
@@ -413,6 +423,11 @@ def main():
         f.write(f"\nmean Average Precision (mAP):\n")
         for iou_thresh, ap in map_scores.items():
             f.write(f"  IoU {iou_thresh}: {ap:.4f}\n")
+
+        f.write(f"\nmean Intersection over Union (mIoU):\n")
+        for iou_thresh in args.iou_eval:
+            miou = evaluator.compute_miou(all_preds, all_gt, iou_threshold=iou_thresh)
+            f.write(f"  IoU threshold {iou_thresh}: {miou:.4f}\n")
 
         f.write(f"\nDataset Statistics:\n")
         f.write(f"  Total images: {stats['processed']}\n")

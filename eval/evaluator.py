@@ -352,6 +352,43 @@ class ObjectDetectionEvaluator:
 
         return map_scores
 
+    def compute_miou(
+        self,
+        predictions: List[List[Tuple[float, float, float, float, float]]],
+        ground_truth: List[List[Tuple[float, float, float, float]]],
+        iou_threshold: float = 0.5
+    ) -> float:
+        """
+        Compute mean Intersection over Union (mIoU) for all true positive predictions.
+
+        Args:
+            predictions: List of prediction lists per image
+            ground_truth: List of ground truth lists per image
+            iou_threshold: IoU threshold to determine true positives
+
+        Returns:
+            Mean IoU across all true positive detections
+        """
+        all_tp_ious = []
+
+        for preds, gts in zip(predictions, ground_truth):
+            if len(preds) == 0 or len(gts) == 0:
+                continue
+
+            # Get IoU scores for this image
+            tp, fp, fn, iou_scores = self.match_predictions_to_ground_truth(
+                preds, gts, iou_threshold
+            )
+
+            # Collect IoU scores for true positives (IoU >= threshold)
+            tp_ious = [iou for iou in iou_scores if iou >= iou_threshold]
+            all_tp_ious.extend(tp_ious)
+
+        if len(all_tp_ious) == 0:
+            return 0.0
+
+        return np.mean(all_tp_ious)
+
     def get_summary_metrics(
         self,
         batch_results: Dict[float, Tuple[int, int, int]]
